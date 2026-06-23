@@ -252,7 +252,91 @@ def ejecutar_pipeline() -> pd.DataFrame:
     return df_final
 
 
-if __name__ == "__main__":
+def validar_esquema_completo(df: pd.DataFrame, nombre: str) -> dict:
+    """
+    Realiza validacion completa del esquema del dataset.
+
+    Args:
+        df: DataFrame a validar
+        nombre: Nombre del dataset
+    Returns:
+        Diccionario con resultados de validacion
+    """
+    resultado = {
+        "dataset": nombre,
+        "filas": df.shape[0],
+        "columnas": df.shape[1],
+        "nulos_total": int(df.isnull().sum().sum()),
+        "porcentaje_nulos": round(df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100, 2),
+        "duplicados": int(df.duplicated().sum()),
+        "tipos_datos": df.dtypes.astype(str).to_dict(),
+        "validacion_ok": True,
+        "errores": []
+    }
+
+    if df.shape[0] == 0:
+        resultado["validacion_ok"] = False
+        resultado["errores"].append("Dataset vacio")
+        logger.error(f"{nombre}: Dataset vacio")
+
+    if df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) > 0.5:
+        resultado["validacion_ok"] = False
+        resultado["errores"].append("Mas del 50% de valores nulos")
+        logger.warning(f"{nombre}: Alto porcentaje de nulos")
+
+    if df.duplicated().sum() > df.shape[0] * 0.3:
+        resultado["validacion_ok"] = False
+        resultado["errores"].append("Mas del 30% de duplicados")
+        logger.warning(f"{nombre}: Alto porcentaje de duplicados")
+
+    if resultado["validacion_ok"]:
+        logger.info(f"{nombre}: Validacion de esquema exitosa")
+    else:
+        logger.error(f"{nombre}: Validacion de esquema fallida - {resultado['errores']}")
+
+    return resultado
+
+
+def generar_reporte_calidad(df_final: pd.DataFrame) -> dict:
+    """
+    Genera reporte final de calidad del dataset integrado.
+
+    Args:
+        df_final: DataFrame final integrado
+    Returns:
+        Diccionario con reporte de calidad
+    """
+    reporte = {
+        "total_registros": len(df_final),
+        "total_columnas": df_final.shape[1],
+        "nulos_restantes": int(df_final.isnull().sum().sum()),
+        "duplicados_restantes": int(df_final.duplicated().sum()),
+        "periodos": df_final['periodo'].unique().tolist(),
+        "distribucion_genero": df_final['genero'].value_counts().to_dict(),
+        "edad_promedio": round(df_final['edad'].mean(), 2),
+        "imc_promedio": round(df_final['imc'].mean(), 2),
+        "calidad_ok": True
+    }
+
+    if reporte["nulos_restantes"] > 0:
+        logger.warning(f"Reporte final: {reporte['nulos_restantes']} nulos restantes")
+
+    if reporte["duplicados_restantes"] > 0:
+        logger.warning(f"Reporte final: {reporte['duplicados_restantes']} duplicados restantes")
+
+    logger.info(f"Reporte de calidad generado: {reporte['total_registros']} registros")
+    print("\nReporte de Calidad Final:")
+    for k, v in reporte.items():
+        print(f"  {k}: {v}")
+
+    return reporte
+
+    if __name__ == "__main__":
     df = ejecutar_pipeline()
+
+    validar_esquema_completo(df, "dataset_final")
+    reporte = generar_reporte_calidad(df)
+
+    print("\nPipeline ETL completado exitosamente")
     print(df.head())
     print(df.dtypes)
